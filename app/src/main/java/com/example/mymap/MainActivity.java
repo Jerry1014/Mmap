@@ -14,6 +14,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.baidu.location.BDAbstractLocationListener;
@@ -75,6 +76,7 @@ public class MainActivity extends Activity {
     private SuggestionSearch mSuggestionSearch = null;
     private EditText editText;
     private static final int BAIDU_LOCATION_PERMISSION = 100;
+    private TextView textView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,6 +85,7 @@ public class MainActivity extends Activity {
         //获取地图控件引用
         editText = findViewById(R.id.editText);
         editText.addTextChangedListener(new EditChangedListener());
+        textView = findViewById(R.id.textView);
         mMapView = (MapView) findViewById(R.id.bmapView);
         mBaiduMap = mMapView.getMap();
         mBaiduMap.setMyLocationEnabled(true);
@@ -99,9 +102,7 @@ public class MainActivity extends Activity {
         mBaiduMap.setMapStatus(MapStatusUpdateFactory.zoomTo(18));
         Toast.makeText(getApplicationContext(), "正在定位", Toast.LENGTH_SHORT).show();
 
-        // 开启定位
         initLocationPermission();
-        // 设置单击事件
         initClick();
     }
 
@@ -142,6 +143,7 @@ public class MainActivity extends Activity {
         }
     }
 
+    // 定位初始化
     private void initLocation() {
         LocationManager locManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (!locManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -167,6 +169,7 @@ public class MainActivity extends Activity {
         mLocationClient.start();
     }
 
+    // 设置单击事件
     private void initClick() {
         BaiduMap.OnMapClickListener onMapClickListener = new BaiduMap.OnMapClickListener() {
             /**
@@ -208,6 +211,7 @@ public class MainActivity extends Activity {
         mBaiduMap.setOnMarkerClickListener(onMarkerClickListener);
     }
 
+    // 点击market之后的显示按钮
     private void showSearchButton(final LatLng location) {
         //用来构造InfoWindow的Button
         Button button = new Button(getApplicationContext());
@@ -225,6 +229,7 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 mBaiduMap.clear();
+                textView.setText("");
 
                 PlanNode stNode;
                 if (mLocation != null) stNode = PlanNode.withLocation(mLocation);
@@ -316,6 +321,7 @@ public class MainActivity extends Activity {
                 overlay.setData(walkingRouteResult.getRouteLines().get(0));
                 //在地图上绘制WalkingRouteOverlay
                 overlay.addToMap();
+                textView.setText("我也不知道要多久");
             }
         }
 
