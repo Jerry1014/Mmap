@@ -424,7 +424,7 @@ public class MainActivity extends Activity {
                     suggest.add(suggestionInfo.key);
                 }
             }
-            ArrayAdapter adapter = new ArrayAdapter<String>(getApplicationContext(), android.R.layout.simple_dropdown_item_1line, suggest);
+            ArrayAdapter adapter = new ArrayAdapter<>(getApplicationContext(), android.R.layout.simple_dropdown_item_1line, suggest);
             final ListView autoCompleteTextView = findViewById(R.id.suggestList);
             autoCompleteTextView.setAdapter(adapter);
             // listview监听
