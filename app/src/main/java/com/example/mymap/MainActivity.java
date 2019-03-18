@@ -1,6 +1,10 @@
 package com.example.mymap;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -71,6 +75,7 @@ public class MainActivity extends Activity {
     private PoiSearch mPoiSearch = null;
     private SuggestionSearch mSuggestionSearch = null;
     private EditText editText;
+    private static final int BAIDU_LOCATION_PERMISSION = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,12 +101,54 @@ public class MainActivity extends Activity {
         Toast.makeText(getApplicationContext(), "正在定位", Toast.LENGTH_SHORT).show();
 
         // 开启定位
-        initLocation();
+        initLocationPermission();
         // 设置单击事件
         initClick();
     }
 
+    // 申请定位所需权限
+    private void initLocationPermission() {
+        if (getApplicationContext().checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED ||
+                getApplicationContext().checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                getApplicationContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                getApplicationContext().checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+                getApplicationContext().checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            // 申请一个（或多个）权限，并提供用于回调返回的获取码（用户定义）
+            requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE}, BAIDU_LOCATION_PERMISSION);
+        } else initLocation();
+    }
+
+    // 申请权限的回调函数
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (requestCode) {
+            //requestCode即所声明的权限获取码，在checkSelfPermission时传入
+            case BAIDU_LOCATION_PERMISSION:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    //获取到权限，做相应处理
+                    //调用定位SDK应确保相关权限均被授权，否则会引起定位失败
+                    initLocation();
+                } else {
+                    //没有获取到权限，做特殊处理
+                    Toast.makeText(getApplicationContext(), "获取位置权限失败", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
     private void initLocation() {
+        LocationManager locManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (!locManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            // 未打开位置开关，可能导致定位失败或定位不准，提示用户或做相应处理
+            Toast.makeText(getApplicationContext(), "可以打开位置服务，以获得更精确的定位", Toast.LENGTH_SHORT).show();
+        }
         //定位初始化
         mLocationClient = new LocationClient(this);
 
@@ -131,6 +178,7 @@ public class MainActivity extends Activity {
             @Override
             public void onMapClick(LatLng point) {
             }
+
             /**
              * 地图内 Poi 单击事件回调函数
              *
@@ -193,6 +241,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        mLocationClient.restart();
         //在activity执行onResume时执行mMapView. onResume ()，实现地图生命周期管理
         mMapView.onResume();
     }
@@ -229,16 +278,22 @@ public class MainActivity extends Activity {
             }
             double mLatitude = location.getLatitude();
             double mLongitude = location.getLongitude();
+            float mRadius = location.getRadius();
             if (mLatitude != Double.MIN_VALUE && mLongitude != Double.MIN_VALUE) {
-                MyLocationData locData = new MyLocationData.Builder()
-                        .accuracy(location.getRadius())
-                        // 此处设置开发者获取到的方向信息，顺时针0-360
-                        .direction(location.getDirection()).latitude(mLatitude)
-                        .longitude(mLongitude).build();
-                mBaiduMap.setMyLocationData(locData);
                 mLocation = new LatLng(mLatitude, mLongitude);
                 mLocationCity = location.getCity();
+            } else {
+                Toast.makeText(getApplicationContext(), "定位失败，使用默认位置 " + location.getLocType(), Toast.LENGTH_SHORT).show();
+                mRadius = 0;
+                mLatitude = 41.6577396168;
+                mLongitude = 123.4343104372;
             }
+            MyLocationData locData = new MyLocationData.Builder()
+                    .accuracy(mRadius)
+                    // 此处设置开发者获取到的方向信息，顺时针0-360
+                    .direction(location.getDirection()).latitude(mLatitude)
+                    .longitude(mLongitude).build();
+            mBaiduMap.setMyLocationData(locData);
         }
     }
 
