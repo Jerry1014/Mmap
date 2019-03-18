@@ -8,6 +8,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -400,7 +401,7 @@ public class MainActivity extends Activity {
         @Override
         public void onTextChanged(CharSequence s, int start, int before, int count) {
             String city;
-            if (mLocation == null) city = "沈阳";
+            if (mLocationCity == null) city = "沈阳";
             else city = mLocationCity;
             mSuggestionSearch.requestSuggestion(new SuggestionSearchOption()
                     .city(city)
