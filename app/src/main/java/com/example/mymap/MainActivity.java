@@ -2,8 +2,14 @@ package com.example.mymap;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import com.baidu.location.BDAbstractLocationListener;
@@ -11,11 +17,13 @@ import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.mapapi.map.BaiduMap;
+import com.baidu.mapapi.map.BitmapDescriptorFactory;
 import com.baidu.mapapi.map.InfoWindow;
 import com.baidu.mapapi.map.MapPoi;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.Marker;
+import com.baidu.mapapi.map.MarkerOptions;
 import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.model.LatLng;
 import com.baidu.mapapi.overlayutil.BikingRouteOverlay;
@@ -24,7 +32,15 @@ import com.baidu.mapapi.overlayutil.IndoorRouteOverlay;
 import com.baidu.mapapi.overlayutil.MassTransitRouteOverlay;
 import com.baidu.mapapi.overlayutil.TransitRouteOverlay;
 import com.baidu.mapapi.overlayutil.WalkingRouteOverlay;
+import com.baidu.mapapi.search.core.PoiInfo;
 import com.baidu.mapapi.search.core.SearchResult;
+import com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener;
+import com.baidu.mapapi.search.poi.PoiDetailResult;
+import com.baidu.mapapi.search.poi.PoiDetailSearchResult;
+import com.baidu.mapapi.search.poi.PoiIndoorResult;
+import com.baidu.mapapi.search.poi.PoiNearbySearchOption;
+import com.baidu.mapapi.search.poi.PoiResult;
+import com.baidu.mapapi.search.poi.PoiSearch;
 import com.baidu.mapapi.search.route.BikingRouteResult;
 import com.baidu.mapapi.search.route.DrivingRouteResult;
 import com.baidu.mapapi.search.route.IndoorRouteResult;
@@ -35,6 +51,13 @@ import com.baidu.mapapi.search.route.RoutePlanSearch;
 import com.baidu.mapapi.search.route.TransitRouteResult;
 import com.baidu.mapapi.search.route.WalkingRoutePlanOption;
 import com.baidu.mapapi.search.route.WalkingRouteResult;
+import com.baidu.mapapi.search.sug.OnGetSuggestionResultListener;
+import com.baidu.mapapi.search.sug.SuggestionResult;
+import com.baidu.mapapi.search.sug.SuggestionSearch;
+import com.baidu.mapapi.search.sug.SuggestionSearchOption;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends Activity {
     private MapView mMapView = null;
@@ -43,6 +66,10 @@ public class MainActivity extends Activity {
     private BaiduMap.OnMarkerClickListener onMarkerClickListener = null;
     private RoutePlanSearch mSearch = null;
     private LatLng mLocation = null;
+    private String mLocationCity = null;
+    private PoiSearch mPoiSearch = null;
+    private SuggestionSearch mSuggestionSearch = null;
+    private EditText editText = findViewById(R.id.editText);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +81,10 @@ public class MainActivity extends Activity {
         mBaiduMap.setMyLocationEnabled(true);
         mSearch = RoutePlanSearch.newInstance();
         mSearch.setOnGetRoutePlanResultListener(routePlanResultListener);
+        mSuggestionSearch = SuggestionSearch.newInstance();
+        mSuggestionSearch.setOnGetSuggestionResultListener(suggestionResultListener);
+        mPoiSearch = PoiSearch.newInstance();
+        mPoiSearch.setOnGetPoiSearchResultListener(poiSearchResultListener);
 
         // 设置地图中心点为辽宁沈阳东北大学浑南校区五舍
         mBaiduMap.setMapStatus(MapStatusUpdateFactory.newLatLng(new LatLng(41.6577396168, 123.4343104372)));
@@ -176,6 +207,8 @@ public class MainActivity extends Activity {
         //在activity执行onDestroy时执行mMapView.onDestroy()，实现地图生命周期管理
         mLocationClient.stop();
         mSearch.destroy();
+        mSuggestionSearch.destroy();
+        mPoiSearch.destroy();
         mBaiduMap.setMyLocationEnabled(false);
         //停止监听时移除监听对象
         mBaiduMap.removeMarkerClickListener(onMarkerClickListener);
@@ -193,7 +226,6 @@ public class MainActivity extends Activity {
             }
             double mLatitude = location.getLatitude();
             double mLongitude = location.getLongitude();
-
             if (mLatitude != Double.MIN_VALUE && mLongitude != Double.MIN_VALUE) {
                 MyLocationData locData = new MyLocationData.Builder()
                         .accuracy(location.getRadius())
@@ -201,7 +233,8 @@ public class MainActivity extends Activity {
                         .direction(location.getDirection()).latitude(mLatitude)
                         .longitude(mLongitude).build();
                 mBaiduMap.setMyLocationData(locData);
-                mLocation = new LatLng(mLatitude,mLongitude);
+                mLocation = new LatLng(mLatitude, mLongitude);
+                mLocationCity = location.getCity();
             }
         }
     }
@@ -226,7 +259,6 @@ public class MainActivity extends Activity {
                 overlay.setData(walkingRouteResult.getRouteLines().get(0));
                 //在地图上绘制WalkingRouteOverlay
                 overlay.addToMap();
-                //Toast.makeText(MainActivity.this, "知道了2", Toast.LENGTH_SHORT).show();
             }
         }
 
@@ -293,6 +325,111 @@ public class MainActivity extends Activity {
                 //在地图上绘制TransitRouteOverlay
                 overlay.addToMap();
             }
+        }
+    };
+
+    // 输入框监听
+    class EditChangedListener implements TextWatcher {
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        }
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+            String city;
+            if (mLocation == null) city = "沈阳";
+            else city = mLocationCity;
+            mSuggestionSearch.requestSuggestion(new SuggestionSearchOption()
+                    .city(city)
+                    .keyword(editText.getText().toString()));
+        }
+
+        @Override
+        public void afterTextChanged(Editable s) {
+        }
+    }
+
+
+    // 搜索关键词监听
+    OnGetSuggestionResultListener suggestionResultListener = new OnGetSuggestionResultListener() {
+        @Override
+        public void onGetSuggestionResult(final SuggestionResult suggestionResult) {
+            if (suggestionResult == null || suggestionResult.getAllSuggestions() == null) {
+                return;
+            }
+            final List<String> suggest = new ArrayList<>();
+            List<SuggestionResult.SuggestionInfo> all_suggestion = suggestionResult.getAllSuggestions();
+            if (all_suggestion.size() > 5) {
+                all_suggestion = all_suggestion.subList(0, 5);
+            }
+            for (SuggestionResult.SuggestionInfo suggestionInfo : all_suggestion) {
+                if (suggestionInfo.key != null) {
+                    suggest.add(suggestionInfo.key);
+                }
+            }
+            ArrayAdapter adapter = new ArrayAdapter<String>(getApplicationContext(), android.R.layout.simple_dropdown_item_1line, suggest);
+            final ListView autoCompleteTextView = findViewById(R.id.suggestList);
+            autoCompleteTextView.setAdapter(adapter);
+            // listview监听
+            autoCompleteTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    autoCompleteTextView.setAdapter(null);
+                    LatLng search_location;
+                    if (mLocation == null)
+                        search_location = new LatLng(41.6577396168, 123.4343104372);
+                    else
+                        search_location = new LatLng(mLocation.latitude, mLocation.longitude);
+                    String info = suggest.get(position);
+                    mPoiSearch.searchNearby(new PoiNearbySearchOption()
+                            .keyword(info)
+                            .location(search_location)
+                            .radius(5000));
+                }
+            });
+            adapter.notifyDataSetChanged();
+        }
+    };
+
+    // poi搜索监听
+    OnGetPoiSearchResultListener poiSearchResultListener = new OnGetPoiSearchResultListener() {
+        @Override
+        public void onGetPoiResult(PoiResult poiResult) {
+            if (poiResult.error == SearchResult.ERRORNO.RESULT_NOT_FOUND) {
+                Toast.makeText(getApplicationContext(), "未找到结果", Toast.LENGTH_LONG).show();
+                mPoiSearch.searchNearby(new PoiNearbySearchOption());
+                return;
+            }
+            if (poiResult.error != SearchResult.ERRORNO.NO_ERROR) {
+                Toast.makeText(getApplicationContext(), "搜索错误" + poiResult.error, Toast.LENGTH_LONG).show();
+                return;
+            }
+            //搜索到POI
+            mBaiduMap.clear();
+            StringBuffer icon_name = new StringBuffer("Icon_mark0.png");
+            int tem = 1;
+            for (PoiInfo one_poi : poiResult.getAllPoi()) {
+                icon_name.replace(9, 9, Integer.toString(tem));
+                mBaiduMap.addOverlay(
+                        new MarkerOptions()
+                                .position(one_poi.location)
+                                .icon(BitmapDescriptorFactory.fromAsset(icon_name.toString())));
+                tem++;
+            }
+        }
+
+        @Override
+        public void onGetPoiDetailResult(PoiDetailSearchResult poiDetailSearchResult) {
+
+        }
+
+        @Override
+        public void onGetPoiIndoorResult(PoiIndoorResult poiIndoorResult) {
+        }
+
+        //废弃
+        @Override
+        public void onGetPoiDetailResult(PoiDetailResult poiDetailResult) {
         }
     };
 }
