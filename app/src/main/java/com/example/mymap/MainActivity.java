@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -69,13 +70,15 @@ public class MainActivity extends Activity {
     private String mLocationCity = null;
     private PoiSearch mPoiSearch = null;
     private SuggestionSearch mSuggestionSearch = null;
-    private EditText editText = findViewById(R.id.editText);
+    private EditText editText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         //获取地图控件引用
+        editText = findViewById(R.id.editText);
+        editText.addTextChangedListener(new EditChangedListener());
         mMapView = (MapView) findViewById(R.id.bmapView);
         mBaiduMap = mMapView.getMap();
         mBaiduMap.setMyLocationEnabled(true);
@@ -128,7 +131,6 @@ public class MainActivity extends Activity {
             @Override
             public void onMapClick(LatLng point) {
             }
-
             /**
              * 地图内 Poi 单击事件回调函数
              *
@@ -150,7 +152,8 @@ public class MainActivity extends Activity {
              */
             @Override
             public boolean onMarkerClick(Marker marker) {
-                return false;//是否捕获点击事件
+                showSearchButton(marker.getPosition());
+                return true;//是否捕获点击事件
             }
         };
 
@@ -397,7 +400,6 @@ public class MainActivity extends Activity {
         public void onGetPoiResult(PoiResult poiResult) {
             if (poiResult.error == SearchResult.ERRORNO.RESULT_NOT_FOUND) {
                 Toast.makeText(getApplicationContext(), "未找到结果", Toast.LENGTH_LONG).show();
-                mPoiSearch.searchNearby(new PoiNearbySearchOption());
                 return;
             }
             if (poiResult.error != SearchResult.ERRORNO.NO_ERROR) {
@@ -406,10 +408,10 @@ public class MainActivity extends Activity {
             }
             //搜索到POI
             mBaiduMap.clear();
-            StringBuffer icon_name = new StringBuffer("Icon_mark0.png");
+            StringBuilder icon_name = new StringBuilder("Icon_mark0.png");
             int tem = 1;
             for (PoiInfo one_poi : poiResult.getAllPoi()) {
-                icon_name.replace(9, 9, Integer.toString(tem));
+                icon_name.replace(9, 10, Integer.toString(tem));
                 mBaiduMap.addOverlay(
                         new MarkerOptions()
                                 .position(one_poi.location)
