@@ -55,6 +55,7 @@ import com.baidu.mapapi.search.route.OnGetRoutePlanResultListener;
 import com.baidu.mapapi.search.route.PlanNode;
 import com.baidu.mapapi.search.route.RoutePlanSearch;
 import com.baidu.mapapi.search.route.TransitRouteResult;
+import com.baidu.mapapi.search.route.WalkingRouteLine;
 import com.baidu.mapapi.search.route.WalkingRoutePlanOption;
 import com.baidu.mapapi.search.route.WalkingRouteResult;
 import com.baidu.mapapi.search.sug.OnGetSuggestionResultListener;
@@ -63,6 +64,7 @@ import com.baidu.mapapi.search.sug.SuggestionSearch;
 import com.baidu.mapapi.search.sug.SuggestionSearchOption;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends Activity {
@@ -319,10 +321,11 @@ public class MainActivity extends Activity {
             if (walkingRouteResult.getRouteLines().size() > 0) {
                 //获取路径规划数据,(以返回的第一条数据为例)
                 //为WalkingRouteOverlay实例设置路径数据
-                overlay.setData(walkingRouteResult.getRouteLines().get(0));
+                WalkingRouteLine line = walkingRouteResult.getRouteLines().get(0);
+                overlay.setData(line);
+                textView.setText("路程距离：" + line.getDistance() + "m 路程时间：" + line.getDuration() + 's');
                 //在地图上绘制WalkingRouteOverlay
                 overlay.addToMap();
-                textView.setText("我也不知道要多久");
             }
         }
 
