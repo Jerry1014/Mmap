@@ -6,8 +6,10 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -63,7 +65,13 @@ import com.baidu.mapapi.search.sug.SuggestionResult;
 import com.baidu.mapapi.search.sug.SuggestionSearch;
 import com.baidu.mapapi.search.sug.SuggestionSearchOption;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.sql.Time;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -275,6 +283,25 @@ public class MainActivity extends Activity {
         mMapView = null;
     }
 
+    // 记录路径信息
+    public static void writeRecord(Context context, String filename, String content) throws IOException {
+
+        //获取外部存储卡的可用状态
+        String storageState = Environment.getExternalStorageState();
+
+        //判断是否存在可用的的SD Card
+        if (storageState.equals(Environment.MEDIA_MOUNTED)) {
+
+            //路径： /storage/emulated/0/Android/data/com.yoryky.demo/cache/yoryky.txt
+            filename = context.getExternalCacheDir().getAbsolutePath() + File.separator + filename;
+
+            FileOutputStream outputStream = new FileOutputStream(filename, true);
+            outputStream.write(content.getBytes());
+            outputStream.close();
+        }
+    }
+
+    // 监听器们
     // 定位监听器
     public class MyLocationListener extends BDAbstractLocationListener {
         @Override
@@ -286,15 +313,28 @@ public class MainActivity extends Activity {
             double mLatitude = location.getLatitude();
             double mLongitude = location.getLongitude();
             float mRadius = location.getRadius();
+            String time = DateFormat.format("MM-dd hh:mm:ss", Calendar.getInstance().getTime()).toString();
+            String record;
             if (mLatitude != Double.MIN_VALUE && mLongitude != Double.MIN_VALUE) {
                 mLocation = new LatLng(mLatitude, mLongitude);
                 mLocationCity = location.getCity();
+                record = String.valueOf(mLatitude) + ',' + String.valueOf(mLongitude) + ',' + time + '\n';
             } else {
                 Toast.makeText(getApplicationContext(), "定位失败，使用默认位置 " + location.getLocType(), Toast.LENGTH_SHORT).show();
                 mRadius = 0;
                 mLatitude = 41.6577396168;
                 mLongitude = 123.4343104372;
+                record = "定位出错" + time + '\n';
             }
+
+            //  记录路径信息
+            try {
+                writeRecord(getApplicationContext(), "test.txt", record);
+            } catch (IOException e) {
+                Log.d("路径记录", e.getMessage());
+            }
+
+
             MyLocationData locData = new MyLocationData.Builder()
                     .accuracy(mRadius)
                     // 此处设置开发者获取到的方向信息，顺时针0-360
