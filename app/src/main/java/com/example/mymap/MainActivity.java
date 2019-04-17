@@ -3,6 +3,7 @@ package com.example.mymap;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Bundle;
@@ -64,15 +65,17 @@ import com.baidu.mapapi.search.sug.OnGetSuggestionResultListener;
 import com.baidu.mapapi.search.sug.SuggestionResult;
 import com.baidu.mapapi.search.sug.SuggestionSearch;
 import com.baidu.mapapi.search.sug.SuggestionSearchOption;
+import com.baidu.mapapi.walknavi.WalkNavigateHelper;
+import com.baidu.mapapi.walknavi.adapter.IWEngineInitListener;
+import com.baidu.mapapi.walknavi.adapter.IWRoutePlanListener;
+import com.baidu.mapapi.walknavi.model.WalkRoutePlanError;
+import com.baidu.mapapi.walknavi.params.WalkNaviLaunchParam;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.sql.Time;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends Activity {
@@ -88,6 +91,7 @@ public class MainActivity extends Activity {
     private EditText editText;
     private static final int BAIDU_LOCATION_PERMISSION = 100;
     private TextView textView;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,6 +119,7 @@ public class MainActivity extends Activity {
 
         initLocationPermission();
         initClick();
+        initNavigate();
     }
 
     // 申请定位所需权限
@@ -224,31 +229,75 @@ public class MainActivity extends Activity {
 
     // 点击market之后的显示按钮
     private void showSearchButton(final LatLng location) {
-        //用来构造InfoWindow的Button
-        Button button = new Button(getApplicationContext());
-        button.setText("到这去");
+        // 每次点击market，均显示从定位点到该点的路径规划
+        mBaiduMap.clear();
+        textView.setText("");
 
-        //构造InfoWindow
+        PlanNode stNode;
+        if (mLocation != null) stNode = PlanNode.withLocation(mLocation);
+        else stNode = PlanNode.withLocation(mLocation);
+        PlanNode enNode = PlanNode.withLocation(location);
+        mSearch.walkingSearch((new WalkingRoutePlanOption())
+                .from(stNode)
+                .to(enNode));
+
+        // 点击market同时会显示Button，点击后进入导航活动
+        // 用来构造InfoWindow的Button
+        Button button = new Button(getApplicationContext());
+        button.setText("导航");
+
+        // 构造InfoWindow
         //-10 InfoWindow相对于point在y轴的偏移量
         InfoWindow mInfoWindow = new InfoWindow(button, location, -10);
 
-        //使InfoWindow生效
+        // 使InfoWindow生效
         mBaiduMap.showInfoWindow(mInfoWindow);
 
         // 按钮点击监听
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mBaiduMap.clear();
-                textView.setText("");
+                //起终点位置
+                LatLng startPt = mLocation;
+                LatLng endPt = location;
+                //发起算路
+                WalkNavigateHelper.getInstance().routePlanWithParams(new WalkNaviLaunchParam().stPt(startPt).endPt(endPt), new IWRoutePlanListener() {
+                    @Override
+                    public void onRoutePlanStart() {
+                        //开始算路的回调
+                    }
 
-                PlanNode stNode;
-                if (mLocation != null) stNode = PlanNode.withLocation(mLocation);
-                else stNode = PlanNode.withLocation(new LatLng(41.6577396168, 123.4343104372));
-                PlanNode enNode = PlanNode.withLocation(location);
-                mSearch.walkingSearch((new WalkingRoutePlanOption())
-                        .from(stNode)
-                        .to(enNode));
+                    @Override
+                    public void onRoutePlanSuccess() {
+                        //算路成功
+                        //跳转至诱导页面
+                        Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
+                        startActivity(intent);
+                    }
+
+                    @Override
+                    public void onRoutePlanFail(WalkRoutePlanError walkRoutePlanError) {
+                        //算路失败的回调
+                    }
+                });
+            }
+        });
+    }
+
+    private void initNavigate() {
+        // 获取导航控制类
+        // 引擎初始化
+        WalkNavigateHelper.getInstance().initNaviEngine(this, new IWEngineInitListener() {
+
+            @Override
+            public void engineInitSuccess() {
+                //引擎初始化成功的回调
+                Toast.makeText(getApplicationContext(), "导航初始化", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void engineInitFail() {
+                //引擎初始化失败的回调
             }
         });
     }
@@ -316,7 +365,6 @@ public class MainActivity extends Activity {
             String time = DateFormat.format("MM-dd hh:mm:ss", Calendar.getInstance().getTime()).toString();
             String record;
             if (mLatitude != Double.MIN_VALUE && mLongitude != Double.MIN_VALUE) {
-                mLocation = new LatLng(mLatitude, mLongitude);
                 mLocationCity = location.getCity();
                 record = String.valueOf(mLatitude) + ',' + String.valueOf(mLongitude) + ',' + time + '\n';
             } else {
@@ -326,6 +374,7 @@ public class MainActivity extends Activity {
                 mLongitude = 123.4343104372;
                 record = "定位出错" + time + '\n';
             }
+            mLocation = new LatLng(mLatitude, mLongitude);
 
             //  记录路径信息
             try {
@@ -333,7 +382,6 @@ public class MainActivity extends Activity {
             } catch (IOException e) {
                 Log.d("路径记录", e.getMessage());
             }
-
 
             MyLocationData locData = new MyLocationData.Builder()
                     .accuracy(mRadius)
