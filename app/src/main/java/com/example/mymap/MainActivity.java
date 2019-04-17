@@ -6,14 +6,18 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.text.format.DateFormat;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.baidu.location.BDAbstractLocationListener;
@@ -53,6 +57,7 @@ import com.baidu.mapapi.search.route.OnGetRoutePlanResultListener;
 import com.baidu.mapapi.search.route.PlanNode;
 import com.baidu.mapapi.search.route.RoutePlanSearch;
 import com.baidu.mapapi.search.route.TransitRouteResult;
+import com.baidu.mapapi.search.route.WalkingRouteLine;
 import com.baidu.mapapi.search.route.WalkingRoutePlanOption;
 import com.baidu.mapapi.search.route.WalkingRouteResult;
 import com.baidu.mapapi.search.sug.OnGetSuggestionResultListener;
@@ -60,7 +65,14 @@ import com.baidu.mapapi.search.sug.SuggestionResult;
 import com.baidu.mapapi.search.sug.SuggestionSearch;
 import com.baidu.mapapi.search.sug.SuggestionSearchOption;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.sql.Time;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends Activity {
@@ -75,6 +87,7 @@ public class MainActivity extends Activity {
     private SuggestionSearch mSuggestionSearch = null;
     private EditText editText;
     private static final int BAIDU_LOCATION_PERMISSION = 100;
+    private TextView textView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,6 +96,7 @@ public class MainActivity extends Activity {
         //获取地图控件引用
         editText = findViewById(R.id.editText);
         editText.addTextChangedListener(new EditChangedListener());
+        textView = findViewById(R.id.textView);
         mMapView = (MapView) findViewById(R.id.bmapView);
         mBaiduMap = mMapView.getMap();
         mBaiduMap.setMyLocationEnabled(true);
@@ -99,9 +113,7 @@ public class MainActivity extends Activity {
         mBaiduMap.setMapStatus(MapStatusUpdateFactory.zoomTo(18));
         Toast.makeText(getApplicationContext(), "正在定位", Toast.LENGTH_SHORT).show();
 
-        // 开启定位
         initLocationPermission();
-        // 设置单击事件
         initClick();
     }
 
@@ -142,6 +154,7 @@ public class MainActivity extends Activity {
         }
     }
 
+    // 定位初始化
     private void initLocation() {
         LocationManager locManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (!locManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -167,6 +180,7 @@ public class MainActivity extends Activity {
         mLocationClient.start();
     }
 
+    // 设置单击事件
     private void initClick() {
         BaiduMap.OnMapClickListener onMapClickListener = new BaiduMap.OnMapClickListener() {
             /**
@@ -208,6 +222,7 @@ public class MainActivity extends Activity {
         mBaiduMap.setOnMarkerClickListener(onMarkerClickListener);
     }
 
+    // 点击market之后的显示按钮
     private void showSearchButton(final LatLng location) {
         //用来构造InfoWindow的Button
         Button button = new Button(getApplicationContext());
@@ -225,6 +240,7 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 mBaiduMap.clear();
+                textView.setText("");
 
                 PlanNode stNode;
                 if (mLocation != null) stNode = PlanNode.withLocation(mLocation);
@@ -267,6 +283,25 @@ public class MainActivity extends Activity {
         mMapView = null;
     }
 
+    // 记录路径信息
+    public static void writeRecord(Context context, String filename, String content) throws IOException {
+
+        //获取外部存储卡的可用状态
+        String storageState = Environment.getExternalStorageState();
+
+        //判断是否存在可用的的SD Card
+        if (storageState.equals(Environment.MEDIA_MOUNTED)) {
+
+            //路径： /storage/emulated/0/Android/data/com.yoryky.demo/cache/yoryky.txt
+            filename = context.getExternalCacheDir().getAbsolutePath() + File.separator + filename;
+
+            FileOutputStream outputStream = new FileOutputStream(filename, true);
+            outputStream.write(content.getBytes());
+            outputStream.close();
+        }
+    }
+
+    // 监听器们
     // 定位监听器
     public class MyLocationListener extends BDAbstractLocationListener {
         @Override
@@ -278,15 +313,28 @@ public class MainActivity extends Activity {
             double mLatitude = location.getLatitude();
             double mLongitude = location.getLongitude();
             float mRadius = location.getRadius();
+            String time = DateFormat.format("MM-dd hh:mm:ss", Calendar.getInstance().getTime()).toString();
+            String record;
             if (mLatitude != Double.MIN_VALUE && mLongitude != Double.MIN_VALUE) {
                 mLocation = new LatLng(mLatitude, mLongitude);
                 mLocationCity = location.getCity();
+                record = String.valueOf(mLatitude) + ',' + String.valueOf(mLongitude) + ',' + time + '\n';
             } else {
                 Toast.makeText(getApplicationContext(), "定位失败，使用默认位置 " + location.getLocType(), Toast.LENGTH_SHORT).show();
                 mRadius = 0;
                 mLatitude = 41.6577396168;
                 mLongitude = 123.4343104372;
+                record = "定位出错" + time + '\n';
             }
+
+            //  记录路径信息
+            try {
+                writeRecord(getApplicationContext(), "test.txt", record);
+            } catch (IOException e) {
+                Log.d("路径记录", e.getMessage());
+            }
+
+
             MyLocationData locData = new MyLocationData.Builder()
                     .accuracy(mRadius)
                     // 此处设置开发者获取到的方向信息，顺时针0-360
@@ -313,7 +361,9 @@ public class MainActivity extends Activity {
             if (walkingRouteResult.getRouteLines().size() > 0) {
                 //获取路径规划数据,(以返回的第一条数据为例)
                 //为WalkingRouteOverlay实例设置路径数据
-                overlay.setData(walkingRouteResult.getRouteLines().get(0));
+                WalkingRouteLine line = walkingRouteResult.getRouteLines().get(0);
+                overlay.setData(line);
+                textView.setText("路程距离：" + line.getDistance() + "m 路程时间：" + line.getDuration() + 's');
                 //在地图上绘制WalkingRouteOverlay
                 overlay.addToMap();
             }
@@ -394,7 +444,7 @@ public class MainActivity extends Activity {
         @Override
         public void onTextChanged(CharSequence s, int start, int before, int count) {
             String city;
-            if (mLocation == null) city = "沈阳";
+            if (mLocationCity == null) city = "沈阳";
             else city = mLocationCity;
             mSuggestionSearch.requestSuggestion(new SuggestionSearchOption()
                     .city(city)
