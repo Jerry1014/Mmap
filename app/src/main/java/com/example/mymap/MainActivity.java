@@ -3,8 +3,8 @@ package com.example.mymap;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.AssetFileDescriptor;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Environment;
@@ -15,7 +15,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -27,7 +26,6 @@ import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.BitmapDescriptorFactory;
-import com.baidu.mapapi.map.InfoWindow;
 import com.baidu.mapapi.map.MapPoi;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
@@ -67,16 +65,24 @@ import com.baidu.mapapi.search.sug.SuggestionSearch;
 import com.baidu.mapapi.search.sug.SuggestionSearchOption;
 import com.baidu.mapapi.walknavi.WalkNavigateHelper;
 import com.baidu.mapapi.walknavi.adapter.IWEngineInitListener;
-import com.baidu.mapapi.walknavi.adapter.IWRoutePlanListener;
-import com.baidu.mapapi.walknavi.model.WalkRoutePlanError;
-import com.baidu.mapapi.walknavi.params.WalkNaviLaunchParam;
 
+import org.tensorflow.lite.Interpreter;
+
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class MainActivity extends Activity {
     private MapView mMapView = null;
@@ -88,19 +94,22 @@ public class MainActivity extends Activity {
     private String mLocationCity = null;
     private PoiSearch mPoiSearch = null;
     private SuggestionSearch mSuggestionSearch = null;
-    private EditText editText;
     private static final int BAIDU_LOCATION_PERMISSION = 100;
-    private TextView textView;
+    private EditText search_box;
+    private TextView show_result_view;
+    private Interpreter prediction_model = null;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        load_prediction_model("test0");
+
         setContentView(R.layout.activity_main);
         //获取地图控件引用
-        editText = findViewById(R.id.editText);
-        editText.addTextChangedListener(new EditChangedListener());
-        textView = findViewById(R.id.textView);
+        search_box = findViewById(R.id.editText);
+        search_box.addTextChangedListener(new EditChangedListener());
+        show_result_view = findViewById(R.id.textView);
         mMapView = (MapView) findViewById(R.id.bmapView);
         mBaiduMap = mMapView.getMap();
         mBaiduMap.setMyLocationEnabled(true);
@@ -120,6 +129,22 @@ public class MainActivity extends Activity {
         initLocationPermission();
         initClick();
         initNavigate();
+    }
+
+    private void load_prediction_model(String model) {
+        try {
+            AssetFileDescriptor fileDescriptor = this.getAssets().openFd(model + ".tflite");
+            FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+            FileChannel fileChannel = inputStream.getChannel();
+            long startOffset = fileDescriptor.getStartOffset();
+            long declaredLength = fileDescriptor.getDeclaredLength();
+
+            this.prediction_model = new Interpreter(fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength));
+            Log.d("预测模型", "导入成功");
+        } catch (Exception e) {
+            Toast.makeText(MainActivity.this, model + "预测模型载入失败", Toast.LENGTH_SHORT).show();
+            Log.d("预测模型", "导入失败 " + e.toString());
+        }
     }
 
     // 申请定位所需权限
@@ -231,7 +256,7 @@ public class MainActivity extends Activity {
     private void showSearchButton(final LatLng location) {
         // 每次点击market，均显示从定位点到该点的路径规划
         mBaiduMap.clear();
-        textView.setText("");
+        show_result_view.setText("");
 
         PlanNode stNode;
         if (mLocation != null) stNode = PlanNode.withLocation(mLocation);
@@ -320,6 +345,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        prediction_model.close();
         //在activity执行onDestroy时执行mMapView.onDestroy()，实现地图生命周期管理
         mLocationClient.stop();
         mSearch.destroy();
@@ -365,6 +391,12 @@ public class MainActivity extends Activity {
             String time = DateFormat.format("MM-dd hh:mm:ss", Calendar.getInstance().getTime()).toString();
             String record;
             if (mLatitude != Double.MIN_VALUE && mLongitude != Double.MIN_VALUE) {
+                if (prediction_model != null) {
+                    float[][] input = {{location.getSpeed()}}, output = {{0}};
+                    prediction_model.run(input, output);
+                    show_result_view.setText("当前速度为"+String.valueOf(location.getSpeed()) +" 预测的接下来的速度为:" + String.valueOf(output[0][0]));
+                }
+
                 mLocationCity = location.getCity();
                 record = String.valueOf(mLatitude) + ',' + String.valueOf(mLongitude) + ',' + time + '\n';
             } else {
@@ -411,7 +443,7 @@ public class MainActivity extends Activity {
                 //为WalkingRouteOverlay实例设置路径数据
                 WalkingRouteLine line = walkingRouteResult.getRouteLines().get(0);
                 overlay.setData(line);
-                textView.setText("路程距离：" + line.getDistance() + "m 路程时间：" + line.getDuration() + 's');
+                show_result_view.setText("路程距离：" + line.getDistance() + "m 路程时间：" + line.getDuration() + 's');
                 //在地图上绘制WalkingRouteOverlay
                 overlay.addToMap();
             }
@@ -496,7 +528,7 @@ public class MainActivity extends Activity {
             else city = mLocationCity;
             mSuggestionSearch.requestSuggestion(new SuggestionSearchOption()
                     .city(city)
-                    .keyword(editText.getText().toString()));
+                    .keyword(search_box.getText().toString()));
         }
 
         @Override
