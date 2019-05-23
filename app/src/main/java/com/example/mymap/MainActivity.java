@@ -241,47 +241,47 @@ public class MainActivity extends Activity {
                 .from(stNode)
                 .to(enNode));
 
-        // 点击market同时会显示Button，点击后进入导航活动
-        // 用来构造InfoWindow的Button
-        Button button = new Button(getApplicationContext());
-        button.setText("导航");
-
-        // 构造InfoWindow
-        //-10 InfoWindow相对于point在y轴的偏移量
-        InfoWindow mInfoWindow = new InfoWindow(button, location, -10);
-
-        // 使InfoWindow生效
-        mBaiduMap.showInfoWindow(mInfoWindow);
-
-        // 按钮点击监听
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                //起终点位置
-                LatLng startPt = mLocation;
-                LatLng endPt = location;
-                //发起算路
-                WalkNavigateHelper.getInstance().routePlanWithParams(new WalkNaviLaunchParam().stPt(startPt).endPt(endPt), new IWRoutePlanListener() {
-                    @Override
-                    public void onRoutePlanStart() {
-                        //开始算路的回调
-                    }
-
-                    @Override
-                    public void onRoutePlanSuccess() {
-                        //算路成功
-                        //跳转至诱导页面
-                        Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
-                        startActivity(intent);
-                    }
-
-                    @Override
-                    public void onRoutePlanFail(WalkRoutePlanError walkRoutePlanError) {
-                        //算路失败的回调
-                    }
-                });
-            }
-        });
+//        // 点击market同时会显示Button，点击后进入导航活动
+//        // 用来构造InfoWindow的Button
+//        Button button = new Button(getApplicationContext());
+//        button.setText("导航");
+//
+//        // 构造InfoWindow
+//        //-10 InfoWindow相对于point在y轴的偏移量
+//        InfoWindow mInfoWindow = new InfoWindow(button, location, -10);
+//
+//        // 使InfoWindow生效
+//        mBaiduMap.showInfoWindow(mInfoWindow);
+//
+//        // 按钮点击监听
+//        button.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                //起终点位置
+//                LatLng startPt = mLocation;
+//                LatLng endPt = location;
+//                //发起算路
+//                WalkNavigateHelper.getInstance().routePlanWithParams(new WalkNaviLaunchParam().stPt(startPt).endPt(endPt), new IWRoutePlanListener() {
+//                    @Override
+//                    public void onRoutePlanStart() {
+//                        //开始算路的回调
+//                    }
+//
+//                    @Override
+//                    public void onRoutePlanSuccess() {
+//                        //算路成功
+//                        //跳转至诱导页面
+//                        Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
+//                        startActivity(intent);
+//                    }
+//
+//                    @Override
+//                    public void onRoutePlanFail(WalkRoutePlanError walkRoutePlanError) {
+//                        //算路失败的回调
+//                    }
+//                });
+//            }
+//        });
     }
 
     private void initNavigate() {
