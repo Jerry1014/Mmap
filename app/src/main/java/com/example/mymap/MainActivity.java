@@ -388,29 +388,26 @@ public class MainActivity extends Activity {
             double mLatitude = location.getLatitude();
             double mLongitude = location.getLongitude();
             float mRadius = location.getRadius();
-            String time = DateFormat.format("MM-dd hh:mm:ss", Calendar.getInstance().getTime()).toString();
-            String record;
             if (mLatitude != Double.MIN_VALUE && mLongitude != Double.MIN_VALUE) {
                 if (prediction_model != null) {
                     float[][] input = {{location.getSpeed()}}, output = {{0}};
                     prediction_model.run(input, output);
-                    show_result_view.setText("当前速度为"+String.valueOf(location.getSpeed()) +" 预测的接下来的速度为:" + String.valueOf(output[0][0]));
+                    show_result_view.setText(String.format("当前速度为%s 预测的接下来的速度为:%s", String.valueOf(location.getSpeed()), String.valueOf(output[0][0] + " m/s")));
                 }
-
                 mLocationCity = location.getCity();
-                record = String.valueOf(mLatitude) + ',' + String.valueOf(mLongitude) + ',' + time + '\n';
             } else {
                 Toast.makeText(getApplicationContext(), "定位失败，使用默认位置 " + location.getLocType(), Toast.LENGTH_SHORT).show();
                 mRadius = 0;
                 mLatitude = 41.6577396168;
                 mLongitude = 123.4343104372;
-                record = "定位出错" + time + '\n';
             }
             mLocation = new LatLng(mLatitude, mLongitude);
 
             //  记录路径信息
             try {
-                writeRecord(getApplicationContext(), "test.txt", record);
+                String time = DateFormat.format("MM-dd hh:mm:ss", Calendar.getInstance().getTime()).toString();
+                String record;
+                writeRecord(getApplicationContext(), "test.txt", time + String.valueOf(location.getSpeed()));
             } catch (IOException e) {
                 Log.d("路径记录", e.getMessage());
             }
