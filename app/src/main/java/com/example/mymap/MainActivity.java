@@ -387,7 +387,7 @@ public class MainActivity extends Activity {
                 if (prediction_model != null) {
                     float[][] input = {{location.getSpeed()}}, output = {{0}};
                     prediction_model.run(input, output);
-                    show_speed_info_view.setText(String.format("当前速度为%s 预测的接下来的速度为:%s", String.valueOf(location.getSpeed()), String.valueOf(output[0][0] + " m/s")));
+                    show_speed_info_view.setText(String.format("当前速度为%s 模型预测的下一步的速度为:%s", String.valueOf(location.getSpeed()), String.valueOf(output[0][0] + " m/s")));
                 }
                 mLocationCity = location.getCity();
             } else {
