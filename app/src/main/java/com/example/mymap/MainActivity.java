@@ -68,21 +68,14 @@ import com.baidu.mapapi.walknavi.adapter.IWEngineInitListener;
 
 import org.tensorflow.lite.Interpreter;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URL;
 import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 public class MainActivity extends Activity {
     private MapView mMapView = null;
@@ -96,7 +89,8 @@ public class MainActivity extends Activity {
     private SuggestionSearch mSuggestionSearch = null;
     private static final int BAIDU_LOCATION_PERMISSION = 100;
     private EditText search_box;
-    private TextView show_result_view;
+    private TextView show_travel_info_view;
+    private TextView show_speed_info_view;
     private Interpreter prediction_model = null;
 
 
@@ -109,7 +103,8 @@ public class MainActivity extends Activity {
         //获取地图控件引用
         search_box = findViewById(R.id.editText);
         search_box.addTextChangedListener(new EditChangedListener());
-        show_result_view = findViewById(R.id.textView);
+        show_travel_info_view = findViewById(R.id.travelInfo);
+        show_speed_info_view = findViewById(R.id.speedInfo);
         mMapView = (MapView) findViewById(R.id.bmapView);
         mBaiduMap = mMapView.getMap();
         mBaiduMap.setMyLocationEnabled(true);
@@ -256,7 +251,7 @@ public class MainActivity extends Activity {
     private void showSearchButton(final LatLng location) {
         // 每次点击market，均显示从定位点到该点的路径规划
         mBaiduMap.clear();
-        show_result_view.setText("");
+        show_travel_info_view.setText("");
 
         PlanNode stNode;
         if (mLocation != null) stNode = PlanNode.withLocation(mLocation);
@@ -392,7 +387,7 @@ public class MainActivity extends Activity {
                 if (prediction_model != null) {
                     float[][] input = {{location.getSpeed()}}, output = {{0}};
                     prediction_model.run(input, output);
-                    show_result_view.setText(String.format("当前速度为%s 预测的接下来的速度为:%s", String.valueOf(location.getSpeed()), String.valueOf(output[0][0] + " m/s")));
+                    show_speed_info_view.setText(String.format("当前速度为%s 预测的接下来的速度为:%s", String.valueOf(location.getSpeed()), String.valueOf(output[0][0] + " m/s")));
                 }
                 mLocationCity = location.getCity();
             } else {
@@ -440,7 +435,7 @@ public class MainActivity extends Activity {
                 //为WalkingRouteOverlay实例设置路径数据
                 WalkingRouteLine line = walkingRouteResult.getRouteLines().get(0);
                 overlay.setData(line);
-                show_result_view.setText("路程距离：" + line.getDistance() + "m 路程时间：" + line.getDuration() + 's');
+                show_travel_info_view.setText("路程距离：" + line.getDistance() + "m 路程时间：" + line.getDuration() + 's');
                 //在地图上绘制WalkingRouteOverlay
                 overlay.addToMap();
             }
